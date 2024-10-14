@@ -1,9 +1,10 @@
 from django.contrib.auth import authenticate
 from rest_framework import status
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from terapia.core.models import Profile
-from terapia.core.serializer import ProfileSerializer
+from terapia.core.models import Profile, Sessao
+from terapia.core.serializer import ProfileSerializer, SessoaSerializer
 
 
 class Login(APIView):
@@ -81,3 +82,41 @@ class UsuarioDetail(APIView):
             serializer.save(usuario=usuario, sessao=sessao, pacientes=pacientes)
             return Response(serializer.data)
         return Response(serializer.error_messages, status=status.HTTP_400_BAD_REQUEST)
+    
+class SessaoView(APIView):
+    def get(self, request, pk, format=None):
+        patient = get_object_or_404(Profile, pk=pk)
+        sessions = patient.sessao.all()
+        serializer = SessoaSerializer(sessions, many=True)
+        return Response(serializer.data)
+    
+    def post(self, request, pk, format=None):
+        patient = get_object_or_404(Profile, pk=pk)
+        sessions = request.data.pop("sessao")
+
+        new_session = SessoaSerializer(data=sessions)
+
+        if new_session.is_valid():
+            created_session = new_session.save()
+            patient.sessao.add(created_session)
+            return Response(new_session.data)
+            
+        return Response(new_session.error_messages, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk, format=None):
+        session = get_object_or_404(Sessao, pk=pk)
+        session.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    def put(self, request, pk, format=None):
+        session = get_object_or_404(Sessao, pk=pk)
+        update = request.data.pop("sessao")
+
+        serializer = SessoaSerializer(session, data=update, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        
+        return Response(serializer.error_messages, status=status.HTTP_400_BAD_REQUEST)
+    
